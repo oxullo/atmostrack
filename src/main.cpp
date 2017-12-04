@@ -13,15 +13,16 @@
 #include "veml6070.h"
 #include "mcp9808.h"
 #include "st00008.h"
+#include "power.h"
 
 #include "secrets.h"
 
-#define BTN_A_PIN       9
+#define BTN_A_PIN       9       // A7, do not use
 #define BTN_B_PIN       6
 #define BTN_C_PIN       5
 #define DEBOUNCE_MS     20
 
-#define MAX_PAGES       3
+#define PAGES           4
 
 #define AIO_REPORT_PERIOD       60000
 
@@ -30,7 +31,7 @@ uint32_t ts_next_report = 0;
 
 Adafruit_SSD1306 oled;
 
-Button btnNext(BTN_A_PIN, true, true, DEBOUNCE_MS);
+Button btnNext(BTN_B_PIN, true, true, DEBOUNCE_MS);
 
 uint8_t current_page = 0;
 
@@ -43,6 +44,7 @@ AdafruitIO_Feed *feed_visible = io.feed("visible-radiation");
 AdafruitIO_Feed *feed_ir = io.feed("ir-radiation");
 AdafruitIO_Feed *feed_uv = io.feed("uv-radiation");
 AdafruitIO_Feed *feed_lux = io.feed("lux");
+AdafruitIO_Feed *feed_battery = io.feed("battery-voltage");
 
 void printWiFiStatus()
 {
@@ -67,7 +69,9 @@ void update_buttons()
     btnNext.read();
 
     if (btnNext.wasPressed()) {
-        current_page = (current_page + 1) % MAX_PAGES;
+        current_page = (current_page + 1) % PAGES;
+        Serial.print("PG=");
+        Serial.println(current_page);
     }
 }
 
@@ -137,6 +141,15 @@ void display_fxo()
     oled.display();
 }
 
+void display_power()
+{
+    oled.clearDisplay();
+    oled.setCursor(0, 0);
+    oled.print("Battery V=");
+    oled.println(get_battery_voltage());
+    oled.display();
+}
+
 void check_aio_report()
 {
     io.run();
@@ -148,30 +161,19 @@ void check_aio_report()
         oled.print("Sampling data..");
         oled.display();
 
-        float temperature = bme280_get_temperature();
-        float pressure = bme280_get_pressure();
-        float humidity = bme280_get_humidity();
-        float temperature2 = mcp9808_get_temperature();
-
-        float light_intensity = tsl2591_get_full();
-        float ir_intensity = tsl2591_get_ir();
-
-        float uv_intensity = veml6070_get_uv();
-
-        float lux = tsl2591_get_lux();
-
         oled.println("done");
         oled.println(String(io.statusText()));
         oled.display();
 
-        feed_tbme->save(temperature);
-        feed_tmcp->save(temperature2);
-        feed_pressure->save(pressure);
-        feed_humidity->save(humidity);
-        feed_visible->save(light_intensity);
-        feed_ir->save(ir_intensity);
-        feed_uv->save(uv_intensity);
-        feed_lux->save(lux);
+        feed_tbme->save(bme280_get_temperature());
+        feed_tmcp->save(mcp9808_get_temperature());
+        feed_pressure->save(bme280_get_pressure());
+        feed_humidity->save(bme280_get_humidity());
+        feed_visible->save(tsl2591_get_full());
+        feed_ir->save(tsl2591_get_ir());
+        feed_uv->save(veml6070_get_uv());
+        feed_lux->save(tsl2591_get_lux());
+        feed_battery->save(get_battery_voltage());
 
         oled.println("Data sent");
         oled.display();
@@ -195,9 +197,7 @@ void setup()
     Serial.begin(9600);
     // while (!Serial);
 
-    pinMode(BTN_A_PIN, INPUT_PULLUP);
     pinMode(BTN_B_PIN, INPUT_PULLUP);
-    pinMode(BTN_C_PIN, INPUT_PULLUP);
 
     oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
     oled.setTextSize(1);
@@ -238,6 +238,7 @@ void loop()
 {
 //    debug_values();
     update_buttons();
+    check_aio_report();
 
     switch (current_page) {
         case 0:
@@ -251,6 +252,9 @@ void loop()
         case 2:
             display_fxo();
             break;
+
+        case 3:
+            display_power();
+            break;
     }
-    check_aio_report();
 }
