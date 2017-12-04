@@ -109,8 +109,8 @@ void display_atmos()
     double humidity = bme280_get_humidity();
     double temperature2 = mcp9808_get_temperature();
 
-    // double light_intensity = tsl2591_get_full();
-    // double ir_intensity = tsl2591_get_ir();
+    double light_intensity = tsl2591_get_full();
+    double ir_intensity = tsl2591_get_ir();
     double lux = tsl2591_get_lux();
 
     double uv_intensity = veml6070_get_uv();
@@ -120,7 +120,7 @@ void display_atmos()
     oled.println("** Atmos data");
     oled.println(String(temperature) + "C " + String(humidity) + "% " + String(pressure / 100.0));
     oled.println(String((int)lux) + " lux UVI=" + String((int)uv_intensity));
-    oled.println("T2=" + String(temperature2) + "C");
+    oled.println("FV=" + String((int)light_intensity) + " IR=" + String((int)ir_intensity));
     oled.display();
 }
 
